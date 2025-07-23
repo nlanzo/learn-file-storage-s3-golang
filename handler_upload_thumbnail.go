@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -53,19 +52,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
 		return
 	}
-	thumbnailData, err := io.ReadAll(thumbnailFile)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to read thumbnail file", err)
-		return
-	}
-	// find the fiile extension for the thumbnail file using Content-Type
-	fileExtension := filepath.Ext(fileHeader.Filename)
-	fileName := fmt.Sprintf("%s%s", videoID.String(), fileExtension)
-	// save the thumbnail to disk in the assetsRoot directory
-	thumbnailPath := filepath.Join(cfg.assetsRoot, fileName)
-	err = os.WriteFile(thumbnailPath, thumbnailData, 0644)
+
+	assetPath := getAssetPath(videoID, mediaType)
+	assetDiskPath := cfg.getAssetDiskPath(assetPath)
+	destination, err := os.Create(assetDiskPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to create thumbnail file", err)
+		return
+	}
+	defer destination.Close()
+	if _, err := io.Copy(destination, thumbnailFile); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to copy thumbnail file", err)
 		return
 	}
 
@@ -79,7 +76,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusForbidden, "Not authorized to update this video", nil)
 		return
 	}
-	thumbnailURL := fmt.Sprintf("http://localhost:%s/%s", cfg.port, thumbnailPath)
+
+	thumbnailURL := cfg.getAssetURL(assetPath)
 	dbVideo.ThumbnailURL = &thumbnailURL
 
 	err = cfg.db.UpdateVideo(dbVideo)
