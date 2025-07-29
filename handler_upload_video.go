@@ -125,14 +125,13 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		ContentType: aws.String(mediaType),
 	})
 
-	videoURL := cfg.getObjectURL(key)
+	videoURL := fmt.Sprintf("https://%s/%s", cfg.s3CfDistribution, key)	
 	dbVideo.VideoURL = &videoURL
 	cfg.db.UpdateVideo(dbVideo)
 
+
 	respondWithJSON(w, http.StatusOK, dbVideo)
 }
-
-	
 
 	
 func getVideoAspectRatio(filePath string) (string, error) {
